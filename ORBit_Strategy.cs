@@ -15,6 +15,14 @@ using NinjaTrader.NinjaScript.DrawingTools;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
+    public enum SlMode
+    {
+        Beyond1x,    // 1x range beyond the other side (original)
+        Beyond0p5x,  // 0.5x range beyond the other side
+        OtherSide,   // At the other side of the ORB box
+        OrbMidpoint  // At the ORB midpoint (50% of range)
+    }
+
     /// <summary>
     /// 5-Min ORB Auto Strategy — MES/MNQ/ES/NQ configurable.
     /// 1.0x TP, 2.0x total SL (1.0x extension), dynamic sizing, candle direction filter,
@@ -37,9 +45,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double PointValue { get; set; }
         [NinjaScriptProperty][Display(Name="Max Contracts",Order=3,GroupName="1. Risk")][Range(1,200)]
         public int MaxContracts { get; set; }
-        [NinjaScriptProperty][Display(Name="Use % TP (vs 1x Range)",Order=4,GroupName="1. Risk")]
+        [NinjaScriptProperty][Display(Name="Stop Loss Mode",Description="Beyond1x=1x past other side (original) | Beyond0p5x=0.5x past other side | OtherSide=at ORB edge | OrbMidpoint=50% of ORB",Order=4,GroupName="1. Risk")]
+        public SlMode StopMode { get; set; }
+        [NinjaScriptProperty][Display(Name="Use % TP (vs 1x Range)",Order=5,GroupName="1. Risk")]
         public bool UsePctTP { get; set; }
-        [NinjaScriptProperty][Display(Name="TP %",Description="Profit target as % of entry price. Active only when Use % TP is enabled.",Order=5,GroupName="1. Risk")][Range(0.01,100)]
+        [NinjaScriptProperty][Display(Name="TP %",Description="Profit target as % of entry price. Active only when Use % TP is enabled.",Order=6,GroupName="1. Risk")][Range(0.01,100)]
         public double TpPct { get; set; }
 
         [NinjaScriptProperty][Display(Name="ORB Start Hour (ET)",Order=1,GroupName="2. Timing")][Range(0,23)]
@@ -89,7 +99,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsInstantiatedOnEachOptimizationIteration = true;
 
                 RiskPerTrade = 500; PointValue = 5; MaxContracts = 25;
-                UsePctTP = false; TpPct = 0.25;
+                StopMode = SlMode.Beyond1x; UsePctTP = false; TpPct = 0.25;
                 StartH = 9; StartM = 30; EndH = 9; EndM = 35;
                 DeadH = 11; DeadM = 30; StopH = 15; StopM = 0;
                 SkipWed = false; HalfWed = true;
@@ -149,14 +159,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 candleBias = orbClose > orbMid ? 1 : orbClose < orbMid ? -1 : 0;
 
-                double riskPerCt = orbRange * 2.0 * PointValue;
+                // SL level and distance from entry side (orbHigh for long, orbLow for short)
+                double slExt = StopMode == SlMode.Beyond1x   ? orbRange       :
+                               StopMode == SlMode.Beyond0p5x ? orbRange * 0.5 : 0;
+                if (candleBias == 1)
+                {
+                    tpLevel = orbHigh + orbRange;
+                    slLevel = StopMode == SlMode.OrbMidpoint ? orbMid : orbLow - slExt;
+                }
+                else if (candleBias == -1)
+                {
+                    tpLevel = orbLow  - orbRange;
+                    slLevel = StopMode == SlMode.OrbMidpoint ? orbMid : orbHigh + slExt;
+                }
+
+                // Risk distance: from entry edge to SL
+                double slDist = candleBias == 1  ? orbHigh - slLevel :
+                                candleBias == -1 ? slLevel - orbLow  : orbRange * 2;
+                double riskPerCt = slDist * PointValue;
                 double effectiveRisk = (HalfWed && dow == DayOfWeek.Wednesday) ? RiskPerTrade / 2.0 : RiskPerTrade;
                 calcContracts = riskPerCt > 0 ? (int)Math.Floor(effectiveRisk / riskPerCt) : 0;
                 calcContracts = Math.Min(calcContracts, MaxContracts);
                 if (calcContracts < 1) { orbSet = false; return; }
-
-                if (candleBias == 1)       { tpLevel = orbHigh + orbRange; slLevel = orbLow - orbRange; }
-                else if (candleBias == -1) { tpLevel = orbLow  - orbRange; slLevel = orbHigh + orbRange; }
 
                 // Draw ORB box — areaOpacity (last param, 0-100) controls fill transparency
                 Draw.Rectangle(this, "Box", false,
