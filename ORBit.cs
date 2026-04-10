@@ -215,15 +215,11 @@ namespace NinjaTrader.NinjaScript.Indicators
                 else if (candleBias == -1) { tpLevel = orbLow - orbRange;  slLevel = orbHigh + orbRange; }
 
                 // --- DRAW SHADED ORB BOX ---
-                Color baseColor = ((SolidColorBrush)BoxColor).Color;
-                byte alpha = (byte)(255 * BoxOpacity / 100.0);
-                Brush fillBrush = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
-                fillBrush.Freeze();
-
+                // areaOpacity (last param) is 0-100 and controls fill transparency
                 Draw.Rectangle(this, "ORBBox" + bd.ToString("yyyyMMdd"), false,
                     Time[0].AddMinutes(-(EndM - StartM)), orbHigh,
                     Time[0].AddHours(6), orbLow,
-                    BoxColor, fillBrush, 0);
+                    BoxColor, BoxColor, BoxOpacity);
 
                 // ORB boundary lines (solid through the box, extend right)
                 Draw.Line(this, "ORBHi" + bd.ToString("yyyyMMdd"), false,
