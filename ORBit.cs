@@ -28,7 +28,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         private int contracts, candleBias, breakDir;
         private bool orbSet, boTriggered, tpHit, slHit;
         private DateTime orbDate;
-        private int orbEndBar;
+        private int orbStartBar, orbEndBar;
         #endregion
 
         #region Properties — Risk
@@ -123,7 +123,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             orbClose = orbMid = orbRange = tpLevel = slLevel = 0;
             orbSet = boTriggered = tpHit = slHit = false;
             breakDir = candleBias = contracts = 0;
-            orbEndBar = 0;
+            orbStartBar = orbEndBar = -1;
         }
 
         private int BarMins() { return Time[0].Hour * 60 + Time[0].Minute; }
@@ -147,6 +147,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             // Use the window from the first bar after the start time through the bar at the end time.
             if (bm > orbStart && bm <= orbEnd)
             {
+                if (orbStartBar < 0) orbStartBar = CurrentBar;
                 if (High[0] > orbHigh) orbHigh = High[0];
                 if (Low[0] < orbLow) orbLow = Low[0];
                 orbClose = Close[0];
@@ -159,6 +160,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 orbRange = orbHigh - orbLow;
                 orbMid = (orbHigh + orbLow) / 2.0;
                 orbEndBar = CurrentBar;
+                if (orbStartBar < 0) orbStartBar = CurrentBar;
 
                 if (orbRange <= 0) { orbSet = false; return; }
 
@@ -192,7 +194,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 Draw.Rectangle(this, "ORBBox" + bd.ToString("yyyyMMdd"), false,
                     Time[0].AddMinutes(-(EndM - StartM)), orbHigh,
                     Time[0].AddHours(6), orbLow,
-                    BoxColor, fillBrush, 1);
+                    BoxColor, fillBrush, 0);
 
                 // ORB boundary lines (solid through the box, extend right)
                 Draw.Line(this, "ORBHi" + bd.ToString("yyyyMMdd"), false,
