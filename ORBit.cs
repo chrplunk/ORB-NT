@@ -3,6 +3,7 @@ using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Windows.Media;
+using System.Xml.Serialization;
 using NinjaTrader.Cbi;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
@@ -65,24 +66,61 @@ namespace NinjaTrader.NinjaScript.Indicators
         #endregion
 
         #region Properties — Display
-        [NinjaScriptProperty]
+
+        [XmlIgnore]
         [Display(Name = "ORB Box Color", Order = 1, GroupName = "3. Colors")]
         public Brush BoxColor { get; set; }
+        [Browsable(false)]
+        public string BoxColorSerializable
+        {
+            get { return Serialize.BrushToString(BoxColor); }
+            set { BoxColor = Serialize.StringToBrush(value); }
+        }
+
         [NinjaScriptProperty]
         [Display(Name = "ORB Box Opacity %", Order = 2, GroupName = "3. Colors")][Range(5,80)]
         public int BoxOpacity { get; set; }
-        [NinjaScriptProperty]
+
+        [XmlIgnore]
         [Display(Name = "TP Color", Order = 3, GroupName = "3. Colors")]
         public Brush TpColor { get; set; }
-        [NinjaScriptProperty]
+        [Browsable(false)]
+        public string TpColorSerializable
+        {
+            get { return Serialize.BrushToString(TpColor); }
+            set { TpColor = Serialize.StringToBrush(value); }
+        }
+
+        [XmlIgnore]
         [Display(Name = "SL Color", Order = 4, GroupName = "3. Colors")]
         public Brush SlColor { get; set; }
-        [NinjaScriptProperty]
+        [Browsable(false)]
+        public string SlColorSerializable
+        {
+            get { return Serialize.BrushToString(SlColor); }
+            set { SlColor = Serialize.StringToBrush(value); }
+        }
+
+        [XmlIgnore]
         [Display(Name = "Long Bias Color", Order = 5, GroupName = "3. Colors")]
         public Brush LongColor { get; set; }
-        [NinjaScriptProperty]
+        [Browsable(false)]
+        public string LongColorSerializable
+        {
+            get { return Serialize.BrushToString(LongColor); }
+            set { LongColor = Serialize.StringToBrush(value); }
+        }
+
+        [XmlIgnore]
         [Display(Name = "Short Bias Color", Order = 6, GroupName = "3. Colors")]
         public Brush ShortColor { get; set; }
+        [Browsable(false)]
+        public string ShortColorSerializable
+        {
+            get { return Serialize.BrushToString(ShortColor); }
+            set { ShortColor = Serialize.StringToBrush(value); }
+        }
+
         [NinjaScriptProperty]
         [Display(Name = "Show Alerts", Order = 1, GroupName = "4. Alerts")]
         public bool Alerts { get; set; }
@@ -177,20 +215,11 @@ namespace NinjaTrader.NinjaScript.Indicators
                 else if (candleBias == -1) { tpLevel = orbLow - orbRange;  slLevel = orbHigh + orbRange; }
 
                 // --- DRAW SHADED ORB BOX ---
-                Brush fillBrush;
-                if (BoxColor is SolidColorBrush solidBrush)
-                {
-                    fillBrush = new SolidColorBrush(solidBrush.Color)
-                    {
-                        Opacity = BoxOpacity / 100.0
-                    };
-                }
-                else
-                {
-                    fillBrush = BoxColor.Clone();
-                    fillBrush.Opacity = BoxOpacity / 100.0;
-                }
+                Color baseColor = ((SolidColorBrush)BoxColor).Color;
+                byte alpha = (byte)(255 * BoxOpacity / 100.0);
+                Brush fillBrush = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
                 fillBrush.Freeze();
+
                 Draw.Rectangle(this, "ORBBox" + bd.ToString("yyyyMMdd"), false,
                     Time[0].AddMinutes(-(EndM - StartM)), orbHigh,
                     Time[0].AddHours(6), orbLow,
