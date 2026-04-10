@@ -6,6 +6,7 @@ using System.Windows.Media;
 using NinjaTrader.Cbi;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.Tools;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
@@ -19,7 +20,7 @@ namespace NinjaTrader.NinjaScript.Indicators
     /// Shaded ORB box, directional bias banner + arrow, auto TP/SL lines with dollar labels,
     /// dynamic contract count display. Based on TradingStats.net 6,142-day backtest.
     /// </summary>
-    public class ORB_Indicator : Indicator
+    public class ORBit : Indicator
     {
         #region State
         private double orbHigh, orbLow, orbClose, orbMid, orbRange;
@@ -92,7 +93,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (State == State.SetDefaults)
             {
                 Description = "5-Min ORB — MES/MNQ/ES/NQ configurable. Shaded box, bias arrow, auto TP/SL/contracts.";
-                Name = "ORB_Indicator";
+                Name = "ORBit";
                 Calculate = Calculate.OnBarClose;
                 IsOverlay = true;
                 DrawOnPricePanel = true;
@@ -142,7 +143,9 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (bd != orbDate) { DayReset(); orbDate = bd; }
 
             // === ORB WINDOW ===
-            if (bm >= orbStart && bm < orbEnd)
+            // NinjaTrader bar times are close times, so the bar labeled 9:30 closes at 9:30.
+            // Use the window from the first bar after the start time through the bar at the end time.
+            if (bm > orbStart && bm <= orbEnd)
             {
                 if (High[0] > orbHigh) orbHigh = High[0];
                 if (Low[0] < orbLow) orbLow = Low[0];
@@ -172,13 +175,24 @@ namespace NinjaTrader.NinjaScript.Indicators
                 else if (candleBias == -1) { tpLevel = orbLow - orbRange;  slLevel = orbHigh + orbRange; }
 
                 // --- DRAW SHADED ORB BOX ---
-                Brush fillBrush = BoxColor.Clone();
-                fillBrush.Opacity = BoxOpacity / 100.0;
+                Brush fillBrush;
+                if (BoxColor is SolidColorBrush solidBrush)
+                {
+                    fillBrush = new SolidColorBrush(solidBrush.Color)
+                    {
+                        Opacity = BoxOpacity / 100.0
+                    };
+                }
+                else
+                {
+                    fillBrush = BoxColor.Clone();
+                    fillBrush.Opacity = BoxOpacity / 100.0;
+                }
                 fillBrush.Freeze();
                 Draw.Rectangle(this, "ORBBox" + bd.ToString("yyyyMMdd"), false,
                     Time[0].AddMinutes(-(EndM - StartM)), orbHigh,
                     Time[0].AddHours(6), orbLow,
-                    BoxColor, fillBrush, 0);
+                    BoxColor, fillBrush, 1);
 
                 // ORB boundary lines (solid through the box, extend right)
                 Draw.Line(this, "ORBHi" + bd.ToString("yyyyMMdd"), false,
@@ -238,14 +252,18 @@ namespace NinjaTrader.NinjaScript.Indicators
                     Draw.HorizontalLine(this, "SL" + bd.ToString("yyyyMMdd"),
                         slLevel, SlColor, DashStyleHelper.Dash, 2);
 
+                    double labelOffset = TickSize * 2.0;
+                    double tpLabelY = tpLevel - labelOffset;
+                    double slLabelY = slLevel - labelOffset;
+
                     // TP label
                     Draw.Text(this, "TPLbl" + bd.ToString("yyyyMMdd"),
                         string.Format("── TP {0:F2}  (+${1:F0})", tpLevel, winDollars),
-                        -5, tpLevel, TpColor);
+                        -5, tpLabelY, TpColor);
                     // SL label
                     Draw.Text(this, "SLLbl" + bd.ToString("yyyyMMdd"),
                         string.Format("── SL {0:F2}  (-${1:F0})", slLevel, lossDollars),
-                        -5, slLevel, SlColor);
+                        -5, slLabelY, SlColor);
                 }
 
                 // --- TOP-LEFT INFO PANEL ---

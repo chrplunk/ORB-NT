@@ -5,7 +5,7 @@ A comprehensive Opening Range Breakout (ORB) trading system for NinjaTrader 8, o
 ## Overview
 
 This NinjaTrader addon consists of two components:
-- **ORB_Indicator**: Visual indicator showing the ORB range, bias signals, and automated profit targets/stop losses
+- **ORBit**: Visual indicator showing the ORB range, bias signals, and automated profit targets/stop losses
 - **ORB_Strategy**: Automated trading strategy implementing the ORB breakout methodology
 
 Based on extensive backtesting (6,142 trading days) from TradingStats.net, this system captures opening range breakouts with sophisticated risk management and timing filters.
@@ -43,7 +43,7 @@ Based on extensive backtesting (6,142 trading days) from TradingStats.net, this 
 
 ## Installation
 
-1. Copy `ORB_Indicator.cs` and `ORB_Strategy.cs` to your NinjaTrader scripts directory
+1. Copy `ORBit.cs` and `ORB_Strategy.cs` to your NinjaTrader scripts directory
 2. Compile the scripts in NinjaTrader
 3. Add the indicator to your chart or enable the strategy
 
@@ -84,7 +84,7 @@ Based on TradingStats.net analysis of 6,142 trading days with the following meth
 ## Usage
 
 ### Manual Trading
-1. Add ORB_Indicator to your 5-minute chart
+1. Add ORBit to your 5-minute chart
 2. Configure instrument and risk settings
 3. Wait for ORB range to establish
 4. Enter trades on breakout in bias direction
