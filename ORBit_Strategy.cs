@@ -37,6 +37,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double PointValue { get; set; }
         [NinjaScriptProperty][Display(Name="Max Contracts",Order=3,GroupName="1. Risk")][Range(1,200)]
         public int MaxContracts { get; set; }
+        [NinjaScriptProperty][Display(Name="Use % TP (vs 1x Range)",Order=4,GroupName="1. Risk")]
+        public bool UsePctTP { get; set; }
+        [NinjaScriptProperty][Display(Name="TP %",Description="Profit target as % of entry price. Active only when Use % TP is enabled.",Order=5,GroupName="1. Risk")][Range(0.01,100)]
+        public double TpPct { get; set; }
 
         [NinjaScriptProperty][Display(Name="ORB Start Hour (ET)",Order=1,GroupName="2. Timing")][Range(0,23)]
         public int StartH { get; set; }
@@ -85,6 +89,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsInstantiatedOnEachOptimizationIteration = true;
 
                 RiskPerTrade = 500; PointValue = 5; MaxContracts = 25;
+                UsePctTP = false; TpPct = 0.25;
                 StartH = 9; StartM = 30; EndH = 9; EndM = 35;
                 DeadH = 11; DeadM = 30; StopH = 15; StopM = 0;
                 SkipWed = false; HalfWed = true;
@@ -118,6 +123,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // New day
             if (bd != orbDate) { DayReset(); orbDate = bd; }
+
+            // RTH-only guard — ignore all bars outside [ORB start .. time stop]
+            if (bm < orbStart || bm > timeStop) return;
 
             // Skip Wednesday
             if (SkipWed && dow == DayOfWeek.Wednesday) return;
@@ -174,22 +182,30 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (candleBias == 1 && TradeLongs && Close[0] > orbHigh)
                 {
-                    SetProfitTarget("ORBit_Long", CalculationMode.Price, tpLevel);
+                    if (UsePctTP)
+                        SetProfitTarget("ORBit_Long", CalculationMode.Percent, TpPct / 100.0);
+                    else
+                        SetProfitTarget("ORBit_Long", CalculationMode.Price, tpLevel);
                     SetStopLoss("ORBit_Long", CalculationMode.Price, slLevel, false);
                     EnterLong(calcContracts, "ORBit_Long");
                     enteredToday = true;
-                    Draw.HorizontalLine(this, "TP", tpLevel, Brushes.Lime, DashStyleHelper.Solid, 3);
+                    double drawTP = UsePctTP ? Close[0] * (1 + TpPct / 100.0) : tpLevel;
+                    Draw.HorizontalLine(this, "TP", drawTP, Brushes.Lime, DashStyleHelper.Solid, 3);
                     Draw.HorizontalLine(this, "SL", slLevel, Brushes.Crimson, DashStyleHelper.Solid, 3);
                     Draw.ArrowUp(this, "Entry", false, 0, Low[0] - TickSize * 10, Brushes.Lime);
                     Print(string.Format("[ENTRY] LONG {0} @ {1:F2}", calcContracts, Close[0]));
                 }
                 else if (candleBias == -1 && TradeShorts && Close[0] < orbLow)
                 {
-                    SetProfitTarget("ORBit_Short", CalculationMode.Price, tpLevel);
+                    if (UsePctTP)
+                        SetProfitTarget("ORBit_Short", CalculationMode.Percent, TpPct / 100.0);
+                    else
+                        SetProfitTarget("ORBit_Short", CalculationMode.Price, tpLevel);
                     SetStopLoss("ORBit_Short", CalculationMode.Price, slLevel, false);
                     EnterShort(calcContracts, "ORBit_Short");
                     enteredToday = true;
-                    Draw.HorizontalLine(this, "TP", tpLevel, Brushes.Lime, DashStyleHelper.Solid, 3);
+                    double drawTP = UsePctTP ? Close[0] * (1 - TpPct / 100.0) : tpLevel;
+                    Draw.HorizontalLine(this, "TP", drawTP, Brushes.Lime, DashStyleHelper.Solid, 3);
                     Draw.HorizontalLine(this, "SL", slLevel, Brushes.Crimson, DashStyleHelper.Solid, 3);
                     Draw.ArrowDown(this, "Entry", false, 0, High[0] + TickSize * 10, Brushes.OrangeRed);
                     Print(string.Format("[ENTRY] SHORT {0} @ {1:F2}", calcContracts, Close[0]));
