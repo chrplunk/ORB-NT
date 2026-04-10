@@ -20,7 +20,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     /// 1.0x TP, 2.0x total SL (1.0x extension), dynamic sizing, candle direction filter,
     /// day-of-week filters, time stop. Based on TradingStats.net 6,142-day backtest.
     /// </summary>
-    public class ORB_Strategy : Strategy
+    public class ORBit_Strategy : Strategy
     {
         #region State
         private double orbHigh, orbLow, orbClose, orbMid, orbRange;
@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = "5-Min ORB Strategy — MES/MNQ/ES/NQ. 1.0x TP, 2.0x SL, dynamic sizing.";
-                Name = "ORB_Strategy";
+                Name = "ORBit_Strategy";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -122,16 +122,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Skip Wednesday
             if (SkipWed && dow == DayOfWeek.Wednesday) return;
 
-            // ORB window
-            if (bm >= orbStart && bm < orbEnd)
+            // === ORB WINDOW ===
+            // Bar time in NT8 = close time. Capture bars that close within the ORB window.
+            if (bm > orbStart && bm <= orbEnd)
             {
                 if (High[0] > orbHigh) orbHigh = High[0];
                 if (Low[0] < orbLow) orbLow = Low[0];
                 orbClose = Close[0];
             }
 
-            // ORB established
-            if (bm >= orbEnd && !orbSet && orbHigh != double.MinValue)
+            // === ORB ESTABLISHED ===
+            if (bm > orbEnd && !orbSet && orbHigh != double.MinValue)
             {
                 orbSet = true;
                 orbRange = orbHigh - orbLow;
@@ -146,14 +147,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 calcContracts = Math.Min(calcContracts, MaxContracts);
                 if (calcContracts < 1) { orbSet = false; return; }
 
-                if (candleBias == 1)      { tpLevel = orbHigh + orbRange; slLevel = orbLow - orbRange; }
-                else if (candleBias == -1) { tpLevel = orbLow - orbRange;  slLevel = orbHigh + orbRange; }
+                if (candleBias == 1)       { tpLevel = orbHigh + orbRange; slLevel = orbLow - orbRange; }
+                else if (candleBias == -1) { tpLevel = orbLow  - orbRange; slLevel = orbHigh + orbRange; }
 
-                // Draw ORB box
-                Brush fill = Brushes.DodgerBlue.Clone(); fill.Opacity = 0.15; fill.Freeze();
+                // Draw ORB box — areaOpacity (last param, 0-100) controls fill transparency
                 Draw.Rectangle(this, "Box", false,
                     Time[0].AddMinutes(-(EndM - StartM)), orbHigh, Time[0].AddHours(6), orbLow,
-                    Brushes.DodgerBlue, fill, 0);
+                    Brushes.DodgerBlue, Brushes.DodgerBlue, 15);
+
                 if (candleBias != 0)
                 {
                     Draw.HorizontalLine(this, "TP", tpLevel, Brushes.Lime, DashStyleHelper.Dash, 2);
@@ -167,14 +168,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // === ENTRY ===
-            if (orbSet && !enteredToday && !doneToday && bm >= orbEnd && bm < deadline
+            // SetProfitTarget/SetStopLoss must be called BEFORE the entry method
+            if (orbSet && !enteredToday && !doneToday && bm > orbEnd && bm < deadline
                 && Position.MarketPosition == MarketPosition.Flat)
             {
                 if (candleBias == 1 && TradeLongs && Close[0] > orbHigh)
                 {
-                    EnterLong(calcContracts, "ORB_Long");
-                    SetProfitTarget("ORB_Long", CalculationMode.Price, tpLevel);
-                    SetStopLoss("ORB_Long", CalculationMode.Price, slLevel, false);
+                    SetProfitTarget("ORBit_Long", CalculationMode.Price, tpLevel);
+                    SetStopLoss("ORBit_Long", CalculationMode.Price, slLevel, false);
+                    EnterLong(calcContracts, "ORBit_Long");
                     enteredToday = true;
                     Draw.HorizontalLine(this, "TP", tpLevel, Brushes.Lime, DashStyleHelper.Solid, 3);
                     Draw.HorizontalLine(this, "SL", slLevel, Brushes.Crimson, DashStyleHelper.Solid, 3);
@@ -183,9 +185,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else if (candleBias == -1 && TradeShorts && Close[0] < orbLow)
                 {
-                    EnterShort(calcContracts, "ORB_Short");
-                    SetProfitTarget("ORB_Short", CalculationMode.Price, tpLevel);
-                    SetStopLoss("ORB_Short", CalculationMode.Price, slLevel, false);
+                    SetProfitTarget("ORBit_Short", CalculationMode.Price, tpLevel);
+                    SetStopLoss("ORBit_Short", CalculationMode.Price, slLevel, false);
+                    EnterShort(calcContracts, "ORBit_Short");
                     enteredToday = true;
                     Draw.HorizontalLine(this, "TP", tpLevel, Brushes.Lime, DashStyleHelper.Solid, 3);
                     Draw.HorizontalLine(this, "SL", slLevel, Brushes.Crimson, DashStyleHelper.Solid, 3);
@@ -198,9 +200,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (bm >= timeStop && Position.MarketPosition != MarketPosition.Flat)
             {
                 if (Position.MarketPosition == MarketPosition.Long)
-                    ExitLong("TimeStop", "ORB_Long");
+                    ExitLong("TimeStop", "ORBit_Long");
                 else
-                    ExitShort("TimeStop", "ORB_Short");
+                    ExitShort("TimeStop", "ORBit_Short");
                 doneToday = true;
                 Print("[TIME STOP] Position flattened");
             }
