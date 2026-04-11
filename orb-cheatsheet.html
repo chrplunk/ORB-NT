@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORBit Strategy — Final Cheat Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #070709;
+    --s1: #0e0e12;
+    --s2: #131318;
+    --border: #1e1e26;
+    --green: #00ff88;
+    --red: #ff3355;
+    --yellow: #ffd000;
+    --blue: #38bdf8;
+    --purple: #a78bfa;
+    --text: #e8e8f0;
+    --muted: #52526a;
+    --dim: #2a2a38;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    padding: 32px;
+    letter-spacing: 0.02em;
+  }
+  .page { max-width: 940px; margin: 0 auto; }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--green);
+  }
+  .title { font-size: 60px; font-weight: 900; letter-spacing: -0.03em; line-height: 1; color: #fff; }
+  .title em { color: var(--green); font-style: normal; }
+  .subtitle { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 5px; }
+  .header-right { text-align: right; }
+  .pf-big { font-size: 48px; font-weight: 900; color: var(--green); line-height: 1; font-family: 'Space Mono', monospace; }
+  .pf-label { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+
+  /* STAT ROW */
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 10px; }
+  .stat { background: var(--s1); padding: 12px 14px; }
+  .stat-v { font-size: 22px; font-weight: 900; font-family: 'Space Mono', monospace; line-height: 1; margin-bottom: 3px; }
+  .stat-v.g { color: var(--green); }
+  .stat-v.y { color: var(--yellow); }
+  .stat-v.w { color: #fff; }
+  .stat-v.r { color: var(--red); }
+  .stat-k { font-size: 11px; color: var(--muted); }
+
+  /* LAYOUT */
+  .row { display: grid; gap: 10px; margin-bottom: 10px; }
+  .c2 { grid-template-columns: 1fr 1fr; }
+  .c3 { grid-template-columns: 1fr 1fr 1fr; }
+  .c13 { grid-template-columns: 1fr 2.2fr; }
+  .c31 { grid-template-columns: 2fr 1fr; }
+
+  .card { background: var(--s1); border: 1px solid var(--border); padding: 16px; }
+  .lbl { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 10px; }
+
+  /* TIMELINE */
+  .tl-wrap { display: flex; margin-bottom: 10px; }
+  .tl { flex: 1; background: var(--s1); border: 1px solid var(--border); border-right: none; padding: 14px 12px; position: relative; }
+  .tl:last-child { border-right: 1px solid var(--border); }
+  .tl-time { font-size: 28px; font-weight: 900; color: #fff; line-height: 1; margin-bottom: 4px; }
+  .tl-head { font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+  .tl-body { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .tl-body strong { color: var(--text); }
+  .tl-accent { position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+
+  /* FLOW STEPS */
+  .flow { display: flex; flex-direction: column; gap: 5px; }
+  .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: flex-start; padding: 11px 12px; background: var(--s2); border: 1px solid var(--border); }
+  .step-n { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--green); margin-top: 2px; }
+  .step-t { font-size: 14px; color: var(--text); line-height: 1.5; }
+  .step-t strong { color: #fff; }
+  .step-t .g { color: var(--green); }
+  .step-t .r { color: var(--red); }
+  .step-t .y { color: var(--yellow); }
+  .step-t .p { color: var(--purple); }
+
+  /* BIAS BOX */
+  .bias-box { background: rgba(0,255,136,0.04); border: 1px solid rgba(0,255,136,0.2); padding: 16px; }
+  .bias-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .bias-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .bias-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .bias-text { font-size: 14px; color: var(--text); line-height: 1.5; }
+  .bias-text strong { color: #fff; }
+  .bias-text em { color: var(--muted); font-style: normal; font-size: 12px; display: block; margin-top: 2px; }
+
+  /* SLTP */
+  .sltp { display: grid; grid-template-columns: 1fr 2px 1fr; background: var(--s1); border: 1px solid var(--border); }
+  .sltp-s { padding: 16px; }
+  .sltp-d { background: var(--border); }
+  .sltp-l { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 0.15em; margin-bottom: 8px; }
+  .sltp-l.tp { color: var(--green); }
+  .sltp-l.sl { color: var(--red); }
+  .sltp-v { font-size: 38px; font-weight: 900; color: #fff; line-height: 1; margin-bottom: 6px; }
+  .sltp-detail { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .sltp-detail strong { color: var(--text); }
+
+  /* SETTINGS TABLE */
+  .settings { border: 1px solid var(--border); overflow: hidden; }
+  .setting { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--border); background: var(--s1); }
+  .setting:last-child { border-bottom: none; }
+  .setting:nth-child(even) { background: var(--s2); }
+  .s-k { font-size: 13px; color: var(--muted); }
+  .s-v { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text); }
+  .s-v.g { color: var(--green); }
+  .s-v.y { color: var(--yellow); }
+  .s-v.r { color: var(--red); }
+
+  /* KILL RULES */
+  .kills { display: flex; flex-direction: column; gap: 5px; }
+  .kill { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; background: rgba(255,51,85,0.04); border: 1px solid rgba(255,51,85,0.15); }
+  .kx { color: var(--red); font-family: 'Space Mono', monospace; font-size: 13px; flex-shrink: 0; font-weight: 700; line-height: 1.4; }
+  .kt { font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .kt strong { color: var(--text); }
+
+  /* WARNING */
+  .warn { background: rgba(255,208,0,0.04); border: 1px solid rgba(255,208,0,0.2); padding: 12px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .wi { color: var(--yellow); font-family: 'Space Mono', monospace; font-size: 13px; flex-shrink: 0; }
+  .wt { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .wt strong { color: var(--yellow); }
+
+  /* DATA SERIES NOTE */
+  .ds-note { background: rgba(56,189,248,0.04); border: 1px solid rgba(56,189,248,0.2); padding: 12px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .ds-icon { color: var(--blue); font-family: 'Space Mono', monospace; font-size: 13px; flex-shrink: 0; }
+  .ds-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .ds-text strong { color: var(--blue); }
+
+  .footer { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 12px; display: flex; justify-content: space-between; }
+  .ft { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="title">ORB<em>it</em></div>
+      <div class="subtitle">MES 06-26 · 5-MIN BARS · 15-MIN ORB · FIRSTCANDLE BIAS · TRADEIFY $50K</div>
+    </div>
+    <div class="header-right">
+      <div class="pf-big">1.72</div>
+      <div class="pf-label">Profit Factor</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><div class="stat-v g">$49,850</div><div class="stat-k">Net Profit ($500 risk)</div></div>
+    <div class="stat"><div class="stat-v w">69.08%</div><div class="stat-k">Win Rate (249 trades)</div></div>
+    <div class="stat"><div class="stat-v g">$3,059</div><div class="stat-k">Profit / Month</div></div>
+    <div class="stat"><div class="stat-v w">3</div><div class="stat-k">Max Consec. Losers</div></div>
+    <div class="stat"><div class="stat-v r">$4,402</div><div class="stat-k">Max Drawdown ⚠</div></div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="tl-wrap">
+    <div class="tl">
+      <div class="tl-accent" style="background:var(--purple);"></div>
+      <div class="tl-time">9:30</div>
+      <div class="tl-head" style="color:var(--purple);">First Candle Starts</div>
+      <div class="tl-body">5-min bar begins. Track its <strong>high and low</strong>. This candle determines today's bias.</div>
+    </div>
+    <div class="tl">
+      <div class="tl-accent" style="background:var(--purple);"></div>
+      <div class="tl-time">9:35</div>
+      <div class="tl-head" style="color:var(--purple);">Bias Locked</div>
+      <div class="tl-body">First candle closes. Compare close to its midpoint. <strong>Above = bullish. Below = bearish.</strong> Bias is set for the day.</div>
+    </div>
+    <div class="tl">
+      <div class="tl-accent" style="background:var(--green);"></div>
+      <div class="tl-time">9:45</div>
+      <div class="tl-head" style="color:var(--green);">ORB Locked</div>
+      <div class="tl-body">15-min range is complete. <strong>orbHigh and orbLow are set.</strong> Now watch for the first 5-min close beyond the range.</div>
+    </div>
+    <div class="tl">
+      <div class="tl-accent" style="background:var(--green);"></div>
+      <div class="tl-time">ENTRY</div>
+      <div class="tl-head" style="color:var(--green);">Signal Bar</div>
+      <div class="tl-body">5-min bar closes <strong>above ORB high</strong> (if bullish bias) or <strong>below ORB low</strong> (if bearish bias). Enter at market on close.</div>
+    </div>
+    <div class="tl">
+      <div class="tl-accent" style="background:var(--yellow);"></div>
+      <div class="tl-time">11:00</div>
+      <div class="tl-head" style="color:var(--yellow);">Deadline</div>
+      <div class="tl-body"><strong>No new entries after 11:00 ET.</strong> No signal by then = flat for the day.</div>
+    </div>
+    <div class="tl">
+      <div class="tl-accent" style="background:var(--red);"></div>
+      <div class="tl-time">3:00 PM</div>
+      <div class="tl-head" style="color:var(--red);">Time Stop</div>
+      <div class="tl-body"><strong>Flatten everything</strong> at market. No holding into close. Non-negotiable.</div>
+    </div>
+  </div>
+
+  <!-- FLOW + BIAS -->
+  <div class="row c13">
+    <div>
+      <div class="lbl">Bias Filter — FirstCandle Mode</div>
+      <div class="bias-box">
+        <div class="bias-row">
+          <div class="bias-icon">🟢</div>
+          <div class="bias-text">
+            <strong>Bullish bias</strong> — 9:35 close lands in the <strong>upper half</strong> of the 9:30–9:35 candle's range.
+            <em>Only long breakouts are valid today. Short signals are ignored entirely.</em>
+          </div>
+        </div>
+        <div class="bias-row">
+          <div class="bias-icon">🔴</div>
+          <div class="bias-text">
+            <strong>Bearish bias</strong> — 9:35 close lands in the <strong>lower half</strong> of the 9:30–9:35 candle's range.
+            <em>Only short breakouts are valid today. Long signals are ignored entirely.</em>
+          </div>
+        </div>
+        <div class="bias-row">
+          <div class="bias-icon">📐</div>
+          <div class="bias-text">
+            <strong>Midpoint formula:</strong> (firstCandleHigh + firstCandleLow) ÷ 2<br>
+            <em>This is separate from the 15-min ORB midpoint. Bias uses only the first 5-min candle's own range.</em>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow">
+      <div class="lbl">Step-by-Step — Exact Code Logic</div>
+      <div class="step">
+        <div class="step-n">01</div>
+        <div class="step-t"><strong>9:30–9:35:</strong> Track <span class="g">firstCandleHigh</span> and <span class="r">firstCandleLow</span> across all ticks of the first 5-min bar.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">02</div>
+        <div class="step-t"><strong>9:35 bar closes:</strong> Calculate midpoint of first candle. Close ≥ midpoint → <span class="g">candleBias = 1 (long only)</span>. Close &lt; midpoint → <span class="r">candleBias = -1 (short only)</span>. Bias is now locked for the day.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">03</div>
+        <div class="step-t"><strong>9:30–9:45:</strong> ORB continues building. Track <span class="g">orbHigh</span> and <span class="r">orbLow</span> across all three 5-min bars. <span class="y">Do not enter yet.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-n">04</div>
+        <div class="step-t"><strong>9:45:</strong> ORB locks. <strong>orbRange = orbHigh − orbLow.</strong> Now watching for breakout signal every bar.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">05</div>
+        <div class="step-t"><strong>Signal:</strong> First 5-min bar that closes beyond the range <span class="p">AND</span> matches bias → <strong>enter at market on bar close.</strong> Size = RiskPerTrade ÷ (orbRange × 2.0 × PointValue).</div>
+      </div>
+      <div class="step">
+        <div class="step-n">06</div>
+        <div class="step-t"><strong>Bracket fires:</strong> TP = entry ± <span class="g">0.28% of entry price</span>. SL = entry ∓ <span class="r">orbRange × 2.0</span>. OCO. Done for the day.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLTP + SETTINGS -->
+  <div class="row c2">
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="sltp">
+        <div class="sltp-s">
+          <div class="sltp-l tp">TAKE PROFIT</div>
+          <div class="sltp-v">0.28%</div>
+          <div class="sltp-detail">Of <strong>entry price per bar.</strong><br>MES at 5,000 → TP = <strong>5,014 pts</strong><br>Re-optimize every 4–6 weeks.</div>
+        </div>
+        <div class="sltp-d"></div>
+        <div class="sltp-s">
+          <div class="sltp-l sl">STOP LOSS</div>
+          <div class="sltp-v">2.0×</div>
+          <div class="sltp-detail">ORB range × 2.0 from <strong>entry.</strong><br>10pt range → SL = <strong>20pts from entry</strong><br>Configurable. Test 0.5×–2.0×.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="lbl">NinjaTrader Settings</div>
+        <div class="settings">
+          <div class="setting"><span class="s-k">Risk Per Trade</span><span class="s-v r">$500 → use $200 for eval</span></div>
+          <div class="setting"><span class="s-k">Point Value</span><span class="s-v">2 (MES) / 5 (MNQ)</span></div>
+          <div class="setting"><span class="s-k">Max Contracts</span><span class="s-v">25</span></div>
+          <div class="setting"><span class="s-k">TP %</span><span class="s-v g">0.28</span></div>
+          <div class="setting"><span class="s-k">SL Multiplier</span><span class="s-v">2.0×</span></div>
+          <div class="setting"><span class="s-k">ORB Window</span><span class="s-v">9:30 – 9:45 ET</span></div>
+          <div class="setting"><span class="s-k">Entry Deadline</span><span class="s-v">11:00 ET</span></div>
+          <div class="setting"><span class="s-k">Time Stop</span><span class="s-v">15:00 ET</span></div>
+          <div class="setting"><span class="s-k">Bias Filter</span><span class="s-v g">ON</span></div>
+          <div class="setting"><span class="s-k">Bias Mode</span><span class="s-v g">FirstCandle</span></div>
+          <div class="setting"><span class="s-k">Trade Longs + Shorts</span><span class="s-v g">ON</span></div>
+          <div class="setting"><span class="s-k">Chart Type</span><span class="s-v">Minute · Value = 5</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div class="lbl">Kill Rules</div>
+        <div class="kills">
+          <div class="kill"><div class="kx">×</div><div class="kt"><strong>Bias mismatch</strong> — long fires on bearish day or vice versa. Code ignores it automatically. You do nothing.</div></div>
+          <div class="kill"><div class="kx">×</div><div class="kt"><strong>No signal by 11:00 ET</strong> — flat for the day. Do not manually enter after deadline.</div></div>
+          <div class="kill"><div class="kx">×</div><div class="kt"><strong>Already in a trade</strong> — one trade per day only. enteredToday flag blocks all subsequent signals.</div></div>
+          <div class="kill"><div class="kx">×</div><div class="kt"><strong>Still in trade at 3:00 PM</strong> — time stop fires automatically. Position flattened at market.</div></div>
+          <div class="kill"><div class="kx">×</div><div class="kt"><strong>Down $400 on the day</strong> — manually stop. Two losses at $200 approaches Tradeify daily limit.</div></div>
+          <div class="kill"><div class="kx">×</div><div class="kt"><strong>Drawdown near $2,000</strong> — pause strategy. Do not breach the eval trailing drawdown limit.</div></div>
+        </div>
+      </div>
+
+      <div class="ds-note">
+        <div class="ds-icon">i</div>
+        <div class="ds-text"><strong>Data Series — always set to Minute / Value = 5.</strong> Value = 1 breaks everything. The entire strategy — ORB, bias, entry signals — runs on 5-min bars. Never change this.</div>
+      </div>
+
+      <div class="warn">
+        <div class="wi">!</div>
+        <div class="wt"><strong>Change Risk Per Trade to $200 before running on Tradeify eval.</strong> $500 risk produced $4,402 max drawdown — more than double the $2,000 eval limit. At $200 this scales to ~$1,760. Run a fresh backtest at $200 to confirm before going live.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="ft">ORBit Strategy · MES · 5-Min Bars · 15-Min ORB · FirstCandle Bias · 0.28% TP · 2.0× SL</div>
+    <div class="ft">PF 1.72 · WR 69.08% · $3,059/Mo · Max DD $4,402 · Tradeify $50K Eval</div>
+  </div>
+
+</div>
+</body>
+</html>

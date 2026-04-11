@@ -1,5 +1,3 @@
-// Christopher Plunkett April 2026
-
 #region Using declarations
 using System;
 using System.ComponentModel;
@@ -17,9 +15,10 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region Private Variables
         private double orbHigh, orbLow, orbRange;
+        private double firstCandleHigh, firstCandleLow;
         private double tpLevel, slLevel;
         private int calcContracts, candleBias;
-        private bool orbSet, enteredToday, doneToday;
+        private bool orbSet, enteredToday, doneToday, firstCandleCaptured;
         private DateTime orbDate;
         private TimeZoneInfo etZone;
         #endregion
@@ -47,13 +46,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         public bool UsePctTP { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "TP %", Description = "Take profit as % of price (e.g. 0.27 = 0.27%)", Order = 5, GroupName = "1. Risk")]
+        [Display(Name = "TP %", Description = "Take profit as % of price (e.g. 0.28 = 0.28%)", Order = 5, GroupName = "1. Risk")]
         [Range(0.01, 5.0)]
         public double TpPct { get; set; }
 
-        // ── NEW: SL Multiplier ────────────────────────────────────
         [NinjaScriptProperty]
-        [Display(Name = "SL Multiplier (x ORB Range)", Description = "Stop loss distance as multiple of ORB range. 1.0 = full range, 0.5 = half range, 1.5 = 1.5x range", Order = 6, GroupName = "1. Risk")]
+        [Display(Name = "SL Multiplier (x ORB Range)", Description = "Stop loss distance as multiple of ORB range. 2.0 = default.", Order = 6, GroupName = "1. Risk")]
         [Range(0.1, 5.0)]
         public double SlMultiplier { get; set; }
 
@@ -100,8 +98,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // ── 3. Entry Filters ──────────────────────────────────────
         [NinjaScriptProperty]
-        [Display(Name = "Use Bias Filter", Description = "If true: only take longs when ORB candle closes above midpoint, only take shorts when it closes below. Reduces whipsaw trades.", Order = 1, GroupName = "3. Entry Filters")]
+        [Display(Name = "Use Bias Filter", Description = "Enable bias filtering. Direction set by Bias Mode below.", Order = 1, GroupName = "3. Entry Filters")]
         public bool UseBiasFilter { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Bias Mode",
+                 Description = "FirstCandle: bias from 9:30 5-min candle close vs its own high/low midpoint. ORBClose: bias from first bar after ORB ends vs ORB midpoint.",
+                 Order = 2, GroupName = "3. Entry Filters")]
+        public BiasModeType BiasMode { get; set; }
 
         // ── 4. Day Filters ────────────────────────────────────────
         [NinjaScriptProperty]
@@ -118,27 +122,32 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description     = "15-Min ORB Strategy — MNQ/MES. Optimizable TP%, SL Multiplier, and Bias Filter.";
-                Name            = "ORBit_Strategy";
-                Calculate       = Calculate.OnBarClose;
+                Description         = "15-Min ORB Strategy — MES/MNQ. FirstCandle bias. 0.28% TP. 2x SL.";
+                Name                = "ORBit_Strategy";
+                Calculate           = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
-                EntryHandling   = EntryHandling.AllEntries;
+                EntryHandling       = EntryHandling.AllEntries;
                 IsExitOnSessionCloseStrategy = true;
 
-                // Defaults — 15-min ORB, $200 risk for Tradeify $50K eval
-                RiskPerTrade    = 200;
-                PointValue      = 2;      // MNQ default
-                MaxContracts    = 25;
-                UsePctTP        = true;
-                TpPct           = 0.28;
-                SlMultiplier    = 2.0;
+                // ── Risk — matches screenshot ──────────────────────
+                RiskPerTrade  = 500;      // change to 200 for Tradeify eval
+                PointValue    = 2;        // MES=5, MNQ=2
+                MaxContracts  = 25;
+                UsePctTP      = true;
+                TpPct         = 0.28;
+                SlMultiplier  = 2.0;
 
+                // ── Timing — matches screenshot ────────────────────
                 StartH = 9;  StartM = 30;
                 EndH   = 9;  EndM   = 45;
                 DeadH  = 11; DeadM  = 0;
                 StopH  = 15; StopM  = 0;
 
+                // ── Entry Filters — matches screenshot ─────────────
                 UseBiasFilter = true;
+                BiasMode      = BiasModeType.FirstCandle;
+
+                // ── Day Filters — matches screenshot ───────────────
                 TradeLongs  = true;
                 TradeShorts = true;
             }
@@ -152,30 +161,55 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (CurrentBar < 5) return;
 
-            // Convert bar time to ET
             DateTime etTime = TimeZoneInfo.ConvertTimeFromUtc(Time[0].ToUniversalTime(), etZone);
             DateTime etDate = etTime.Date;
 
             // ── Reset daily state ──────────────────────────────────
             if (etDate != orbDate)
             {
-                orbSet       = false;
-                enteredToday = false;
-                doneToday    = false;
-                orbHigh      = 0;
-                orbLow       = double.MaxValue;
-                orbDate      = etDate;
+                orbSet              = false;
+                enteredToday        = false;
+                doneToday           = false;
+                firstCandleCaptured = false;
+                orbHigh             = 0;
+                orbLow              = double.MaxValue;
+                firstCandleHigh     = 0;
+                firstCandleLow      = double.MaxValue;
+                candleBias          = 0;
+                orbDate             = etDate;
             }
 
             if (doneToday) return;
 
-            // ── Build ORB ──────────────────────────────────────────
             TimeSpan t        = etTime.TimeOfDay;
             TimeSpan orbStart = new TimeSpan(StartH, StartM, 0);
-            TimeSpan orbEnd   = new TimeSpan(EndH, EndM, 0);
-            TimeSpan deadline = new TimeSpan(DeadH, DeadM, 0);
-            TimeSpan timeStop = new TimeSpan(StopH, StopM, 0);
+            TimeSpan firstEnd = orbStart.Add(TimeSpan.FromMinutes(5)); // 9:35 ET
+            TimeSpan orbEnd   = new TimeSpan(EndH, EndM, 0);           // 9:45 ET
+            TimeSpan deadline = new TimeSpan(DeadH, DeadM, 0);         // 11:00 ET
+            TimeSpan timeStop = new TimeSpan(StopH, StopM, 0);         // 15:00 ET
 
+            // ── Track first 5-min candle (9:30–9:35) ──────────────
+            if (t >= orbStart && t < firstEnd)
+            {
+                firstCandleHigh = Math.Max(firstCandleHigh, High[0]);
+                firstCandleLow  = Math.Min(firstCandleLow,  Low[0]);
+            }
+
+            // ── Lock FirstCandle bias at 9:35 ─────────────────────
+            // Compare close of first 5-min candle to its own midpoint.
+            // Above midpoint = bullish (long only). Below = bearish (short only).
+            if (!firstCandleCaptured && t >= firstEnd
+                && firstCandleHigh > 0 && firstCandleLow < double.MaxValue)
+            {
+                if (UseBiasFilter && BiasMode == BiasModeType.FirstCandle)
+                {
+                    double firstMid = (firstCandleHigh + firstCandleLow) / 2.0;
+                    candleBias = Close[0] >= firstMid ? 1 : -1;
+                }
+                firstCandleCaptured = true;
+            }
+
+            // ── Build full 15-min ORB (9:30–9:45) ─────────────────
             if (t >= orbStart && t < orbEnd)
             {
                 orbHigh = Math.Max(orbHigh, High[0]);
@@ -183,48 +217,56 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // ── Mark ORB complete on the first bar after orbEnd ────
+            // ── Lock ORB at first bar after 9:45 ──────────────────
             if (!orbSet && t >= orbEnd && orbHigh > 0 && orbLow < double.MaxValue)
             {
-                orbRange   = orbHigh - orbLow;
-                // Bias: 1 = bullish (close above midpoint), -1 = bearish
-                candleBias = Close[0] >= (orbHigh + orbLow) / 2.0 ? 1 : -1;
-                orbSet     = true;
+                orbRange = orbHigh - orbLow;
+
+                // ORBClose mode: bias from first post-ORB close vs ORB midpoint
+                if (UseBiasFilter && BiasMode == BiasModeType.ORBClose)
+                {
+                    double orbMid = (orbHigh + orbLow) / 2.0;
+                    candleBias    = Close[0] >= orbMid ? 1 : -1;
+                }
+
+                orbSet = true;
             }
 
             if (!orbSet) return;
 
-            // ── Time stop: flatten and stop trading ────────────────
+            // ── Time stop: flatten and quit ────────────────────────
             if (t >= timeStop)
             {
                 if (Position.MarketPosition != MarketPosition.Flat)
-                    ExitLong(); ExitShort();
+                {
+                    ExitLong();
+                    ExitShort();
+                }
                 doneToday = true;
                 return;
             }
 
-            // ── Entry deadline ─────────────────────────────────────
+            // ── No entries past deadline or already traded today ───
             if (t >= deadline || enteredToday) return;
 
-            // ── Calculate contracts ────────────────────────────────
-            double slDistance = orbRange * SlMultiplier;
+            // ── Position sizing ────────────────────────────────────
+            double slDistance      = orbRange * SlMultiplier;
             double riskPerContract = slDistance * PointValue;
             if (riskPerContract <= 0) return;
 
-            double riskAmount = RiskPerTrade;
-
-            calcContracts = (int)Math.Floor(riskAmount / riskPerContract);
+            calcContracts = (int)Math.Floor(RiskPerTrade / riskPerContract);
             calcContracts = Math.Max(1, Math.Min(calcContracts, MaxContracts));
 
-            // ── Calculate TP ───────────────────────────────────────
+            // ── TP distance ────────────────────────────────────────
             double tpDistance = UsePctTP
                 ? Close[0] * (TpPct / 100.0)
                 : orbRange;
 
-            // ── Long entry ─────────────────────────────────────────
+            // ── Bias gates ─────────────────────────────────────────
             bool biasOkLong  = !UseBiasFilter || candleBias == 1;
             bool biasOkShort = !UseBiasFilter || candleBias == -1;
 
+            // ── Long entry ─────────────────────────────────────────
             if (TradeLongs && biasOkLong && Close[0] > orbHigh)
             {
                 tpLevel = Close[0] + tpDistance;
@@ -250,5 +292,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 enteredToday = true;
             }
         }
+    }
+
+    public enum BiasModeType
+    {
+        [Description("First 5-min candle (9:30–9:35) close vs its own high/low midpoint")]
+        FirstCandle,
+
+        [Description("First bar after ORB ends vs ORB high/low midpoint")]
+        ORBClose
     }
 }
