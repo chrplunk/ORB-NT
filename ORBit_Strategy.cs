@@ -131,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // ── Risk — matches screenshot ──────────────────────
                 RiskPerTrade  = 500;      // change to 200 for Tradeify eval
-                PointValue    = 2;        // MES=5, MNQ=2
+                PointValue    = 5;        // MES=5, MNQ=2
                 MaxContracts  = 25;
                 UsePctTP      = true;
                 TpPct         = 0.28;
