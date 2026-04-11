@@ -122,29 +122,34 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description         = "15-Min ORB Strategy — MNQ/MES. Bias Mode: FirstCandle (9:30 5-min) or ORBClose (post-9:45).";
+                Description         = "15-Min ORB Strategy — MES/MNQ. FirstCandle bias. 0.28% TP. 2x SL.";
                 Name                = "ORBit_Strategy";
                 Calculate           = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling       = EntryHandling.AllEntries;
                 IsExitOnSessionCloseStrategy = true;
 
-                RiskPerTrade  = 200;
-                PointValue    = 2;        // MNQ default
+                // ── Risk — matches screenshot ──────────────────────
+                RiskPerTrade  = 500;      // change to 200 for Tradeify eval
+                PointValue    = 2;        // MES=5, MNQ=2
                 MaxContracts  = 25;
                 UsePctTP      = true;
                 TpPct         = 0.28;
                 SlMultiplier  = 2.0;
 
+                // ── Timing — matches screenshot ────────────────────
                 StartH = 9;  StartM = 30;
                 EndH   = 9;  EndM   = 45;
                 DeadH  = 11; DeadM  = 0;
                 StopH  = 15; StopM  = 0;
 
+                // ── Entry Filters — matches screenshot ─────────────
                 UseBiasFilter = true;
                 BiasMode      = BiasModeType.FirstCandle;
-                TradeLongs    = true;
-                TradeShorts   = true;
+
+                // ── Day Filters — matches screenshot ───────────────
+                TradeLongs  = true;
+                TradeShorts = true;
             }
             else if (State == State.Configure)
             {
@@ -180,19 +185,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             TimeSpan orbStart = new TimeSpan(StartH, StartM, 0);
             TimeSpan firstEnd = orbStart.Add(TimeSpan.FromMinutes(5)); // 9:35 ET
             TimeSpan orbEnd   = new TimeSpan(EndH, EndM, 0);           // 9:45 ET
-            TimeSpan deadline = new TimeSpan(DeadH, DeadM, 0);
-            TimeSpan timeStop = new TimeSpan(StopH, StopM, 0);
+            TimeSpan deadline = new TimeSpan(DeadH, DeadM, 0);         // 11:00 ET
+            TimeSpan timeStop = new TimeSpan(StopH, StopM, 0);         // 15:00 ET
 
-            // ── Track first 5-min candle high/low (9:30–9:35) ─────
+            // ── Track first 5-min candle (9:30–9:35) ──────────────
             if (t >= orbStart && t < firstEnd)
             {
                 firstCandleHigh = Math.Max(firstCandleHigh, High[0]);
                 firstCandleLow  = Math.Min(firstCandleLow,  Low[0]);
             }
 
-            // ── Lock FirstCandle bias at 9:35 close ───────────────
-            // The 9:35 bar close is the close of the first 5-min candle.
-            // Compare it to the midpoint of that candle's own high/low range.
+            // ── Lock FirstCandle bias at 9:35 ─────────────────────
+            // Compare close of first 5-min candle to its own midpoint.
+            // Above midpoint = bullish (long only). Below = bearish (short only).
             if (!firstCandleCaptured && t >= firstEnd
                 && firstCandleHigh > 0 && firstCandleLow < double.MaxValue)
             {
@@ -217,11 +222,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 orbRange = orbHigh - orbLow;
 
-                // ORBClose mode: bias from first post-ORB bar vs ORB midpoint
+                // ORBClose mode: bias from first post-ORB close vs ORB midpoint
                 if (UseBiasFilter && BiasMode == BiasModeType.ORBClose)
                 {
-                    double orbMid  = (orbHigh + orbLow) / 2.0;
-                    candleBias     = Close[0] >= orbMid ? 1 : -1;
+                    double orbMid = (orbHigh + orbLow) / 2.0;
+                    candleBias    = Close[0] >= orbMid ? 1 : -1;
                 }
 
                 orbSet = true;
@@ -229,7 +234,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!orbSet) return;
 
-            // ── Time stop: flatten and quit for the day ────────────
+            // ── Time stop: flatten and quit ────────────────────────
             if (t >= timeStop)
             {
                 if (Position.MarketPosition != MarketPosition.Flat)
@@ -241,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // ── No entries past deadline or if already traded ──────
+            // ── No entries past deadline or already traded today ───
             if (t >= deadline || enteredToday) return;
 
             // ── Position sizing ────────────────────────────────────
@@ -291,10 +296,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     public enum BiasModeType
     {
-        [Description("First 5-min candle (9:30 close) vs its own high/low midpoint")]
+        [Description("First 5-min candle (9:30–9:35) close vs its own high/low midpoint")]
         FirstCandle,
 
-        [Description("First bar after ORB ends vs ORB high/low midpoint (original)")]
+        [Description("First bar after ORB ends vs ORB high/low midpoint")]
         ORBClose
     }
 }
