@@ -1,100 +1,112 @@
 # ORB-NT
 
-A comprehensive Opening Range Breakout (ORB) trading system for NinjaTrader 8, optimized for Micro E-mini futures (MES/MNQ) and E-mini futures (ES/NQ).
+An Opening Range Breakout (ORB) trading system for NinjaTrader 8, built for Micro E-mini and E-mini futures. Runs on 5-minute bars with a 15-minute ORB window, FirstCandle directional bias, percentage-based take profit, and automatic position sizing.
 
-## Overview
+## Components
 
-This NinjaTrader addon consists of two components:
-- **ORBit**: Visual indicator showing the ORB range, bias signals, and automated profit targets/stop losses
-- **ORB_Strategy**: Automated trading strategy implementing the ORB breakout methodology
+| File | Type | Purpose |
+|------|------|---------|
+| `ORBit.cs` | Indicator | Chart overlay — shaded ORB box, bias arrow, TP/SL lines with dollar labels, contract count panel |
+| `ORBit_Strategy.cs` | Strategy | Automated execution — entries, exits, position sizing, time stop, bias filtering |
+| `orb-cheatsheet.html` | Reference | Visual cheat sheet with backtest stats, step-by-step logic, and settings |
 
-Based on extensive backtesting (6,142 trading days) from TradingStats.net, this system captures opening range breakouts with sophisticated risk management and timing filters.
+## How It Works
 
-## Features
+### Timeline (all times Eastern)
 
-### Core Functionality
-- **5-minute timeframe ORB calculation**
-- **Configurable ORB time window** (start/end times in ET)
-- **Dynamic contract sizing** based on risk per trade
-- **Automated profit targets and stop losses**
-- **Directional bias detection** using candle patterns
-- **Time-based trade deadline** to avoid holding positions overnight
+| Time | Event |
+|------|-------|
+| **9:30 - 9:35** | First 5-min candle tracked. Its close vs its own midpoint sets the **directional bias** for the day. |
+| **9:35** | Bias locked. Above midpoint = bullish (longs only). Below = bearish (shorts only). |
+| **9:30 - 9:45** | Full 15-minute ORB range builds. `orbHigh` and `orbLow` are tracked across all bars. |
+| **9:45** | ORB locks. Range, TP, SL, and contract size are calculated. Watching for breakout. |
+| **After 9:45** | First 5-min bar that **closes** beyond ORB high (long) or ORB low (short) matching bias direction triggers entry at market on bar close. |
+| **11:00** | Entry deadline. No signal by now = flat for the day. |
+| **3:00 PM** | Time stop. All positions flattened at market. |
 
-### Visual Indicators
-- **Shaded ORB box** showing the opening range
-- **Directional bias banner and arrow** signals
-- **Auto TP/SL lines** with dollar amount labels
-- **Dynamic contract count display**
-- **Color-coded signals** (customizable)
+### Bias Filter — FirstCandle Mode
 
-### Risk Management
-- **Fixed dollar risk per trade** ($50-$100,000 range)
-- **Point value configuration** for different instruments:
-  - MES (Micro E-mini S&P 500): 5 points
-  - MNQ (Micro E-mini Nasdaq): 2 points
-  - ES (E-mini S&P 500): 50 points
-  - NQ (E-mini Nasdaq): 20 points
+The first 5-minute candle (9:30-9:35) determines the day's directional bias:
 
-### Strategy Filters
-- **Candle direction confirmation**
-- **Day-of-week trading filters**
-- **Time-based position exit**
-- **1:1 risk-reward ratio** with 2:1 total stop loss
+- **Bullish**: Close >= midpoint of the first candle's range. Only long breakouts are valid.
+- **Bearish**: Close < midpoint of the first candle's range. Only short breakouts are valid.
+- **Neutral** (indicator only): Close equals midpoint exactly. No trade.
+
+An alternative **ORBClose** mode is available in the strategy, which sets bias from the first bar after the ORB ends vs the ORB midpoint.
+
+### Position Sizing
+
+```
+stopDistance = orbRange x SlMultiplier (default 2.0)
+riskPerContract = stopDistance x PointValue
+contracts = floor(RiskPerTrade / riskPerContract)
+contracts = clamp(1, MaxContracts)
+```
+
+### Take Profit / Stop Loss
+
+- **TP**: 0.28% of entry price (percentage-based, configurable). At MES ~5,000 this is roughly 14 points.
+- **SL**: ORB range x 2.0 from entry (configurable via `SlMultiplier`).
+- The strategy can alternatively use 1x ORB range as TP when `UsePctTP` is set to false.
+
+### One Trade Per Day
+
+The `enteredToday` flag ensures only one entry per session. Once a trade is placed, all subsequent signals are ignored.
+
+## Backtest Results (MES, 5-min bars, $500 risk)
+
+| Metric | Value |
+|--------|-------|
+| Net Profit | $49,850 |
+| Profit Factor | 1.72 |
+| Win Rate | 69.08% (249 trades) |
+| Profit / Month | $3,059 |
+| Max Consecutive Losers | 3 |
+| Max Drawdown | $4,402 |
+
+> **Tradeify eval warning**: $500 risk produced $4,402 max drawdown, exceeding the $2,000 trailing drawdown limit. Use $200 risk for eval accounts (projected ~$1,760 max DD). Run a fresh backtest at $200 to confirm.
+
+## Default Settings
+
+| Setting | Default |
+|---------|---------|
+| Risk Per Trade | $500 (use $200 for eval) |
+| Point Value | MES = 5, MNQ = 2, ES = 50, NQ = 20 |
+| Max Contracts | 25 |
+| TP % | 0.28 |
+| SL Multiplier | 2.0x |
+| ORB Window | 9:30 - 9:45 ET |
+| Entry Deadline | 11:00 ET |
+| Time Stop | 15:00 ET |
+| Bias Filter | On (FirstCandle mode) |
+| Trade Longs + Shorts | Both enabled |
+| Chart Type | Minute, Value = 5 |
 
 ## Installation
 
-1. Copy `ORBit.cs` and `ORB_Strategy.cs` to your NinjaTrader scripts directory
-2. Compile the scripts in NinjaTrader
-3. Add the indicator to your chart or enable the strategy
+1. Copy `ORBit.cs` and `ORBit_Strategy.cs` to your NinjaTrader 8 custom scripts directory:
+   - `Documents/NinjaTrader 8/bin/Custom/Indicators/` (indicator)
+   - `Documents/NinjaTrader 8/bin/Custom/Strategies/` (strategy)
+2. Open NinjaTrader's NinjaScript Editor and compile.
+3. Add the **ORBit** indicator to a 5-minute chart, or enable **ORBit_Strategy** for automated trading.
 
-## Configuration
+## Indicator Features (ORBit.cs)
 
-### Risk Settings
-- **Risk Per Trade**: Maximum dollar amount to risk per trade
-- **Point Value**: Contract point value for P&L calculations
-- **Max Contracts**: Maximum position size limit
-
-### Timing Settings
-- **ORB Start Time**: When the opening range begins (ET)
-- **ORB End Time**: When the opening range closes (ET)
-- **Trade Deadline**: Latest time to exit positions (ET)
-
-### Display Settings
-- **ORB Box Color & Opacity**: Visual styling for the range box
-- **TP/SL Colors**: Profit target and stop loss line colors
-- **Bias Colors**: Long/short signal colors
-- **Alert Settings**: Enable/disable audio/visual alerts
+- Shaded ORB box with high/low boundary lines and midpoint
+- Bias arrow and "LONG ONLY" / "SHORT ONLY" banner
+- Dashed TP/SL lines on ORB lock, solid lines on breakout confirmation
+- Entry arrow and dotted entry line on breakout
+- Top-left info panel: instrument, bias, range, contracts, risk, TP/SL, R:R
+- Bottom-left entry panel on breakout with full trade details
+- Bottom-right result panel (TP HIT / SL HIT) with dollar P&L
+- Configurable colors, opacity, and audio alerts
 
 ## Supported Instruments
 
-- **MES** (Micro E-mini S&P 500 Futures)
-- **MNQ** (Micro E-mini Nasdaq-100 Futures)
-- **ES** (E-mini S&P 500 Futures)
-- **NQ** (E-mini Nasdaq-100 Futures)
-
-## Backtest Results
-
-Based on TradingStats.net analysis of 6,142 trading days with the following methodology:
-- 5-minute ORB on MES/MNQ/ES/NQ
-- 1:1 risk-reward with 2:1 stop loss extension
-- Dynamic position sizing
-- Candle bias and day filters
-- Time-based exit rules
-
-## Usage
-
-### Manual Trading
-1. Add ORBit to your 5-minute chart
-2. Configure instrument and risk settings
-3. Wait for ORB range to establish
-4. Enter trades on breakout in bias direction
-5. Use auto TP/SL levels for exit targets
-
-### Automated Trading
-1. Enable ORB_Strategy on your chart
-2. Configure all settings as desired
-3. Start automated trading during market hours
-4. Monitor performance and adjust filters as needed
+- **MES** — Micro E-mini S&P 500 (Point Value = 5)
+- **MNQ** — Micro E-mini Nasdaq-100 (Point Value = 2)
+- **ES** — E-mini S&P 500 (Point Value = 50)
+- **NQ** — E-mini Nasdaq-100 (Point Value = 20)
 
 ## Risk Disclaimer
 
@@ -105,7 +117,3 @@ This software is for educational and research purposes. Futures trading involves
 MIT License - Copyright (c) 2026 chrplunk
 
 See LICENSE file for full license text.
-
-## Support
-
-For questions or issues, please refer to the NinjaTrader community forums or create an issue in the repository.
